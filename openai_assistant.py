@@ -1,13 +1,14 @@
 import os
-from typing import Literal, List
 import time
+from dataclasses import dataclass
+from typing import Literal, List
+
 from openai import OpenAI
 from openai.types.beta import AssistantDeleted
-from openai.types.beta.threads import MessageContentText, MessageContentImageFile
-from openai.types.beta.threads.thread_message import ThreadMessage
 from openai.types.beta.threads.run import Run
-from dataclasses import dataclass
+from openai.types.beta.threads.thread_message import ThreadMessage
 from openai.types.file_object import FileObject
+
 
 @dataclass
 class AssistantFile:
@@ -15,9 +16,10 @@ class AssistantFile:
     file_path: str | None = None
     file_object: FileObject | None = None
 
+
 class AssistantThreadMessage:
 
-    def __init__(self, thread_message:ThreadMessage):
+    def __init__(self, thread_message: ThreadMessage):
         self.thread_message = thread_message
 
     def get_thread_message(self) -> ThreadMessage:
@@ -46,7 +48,7 @@ class AssistantThreadMessage:
             return self.thread_message.content[0].text.annotations
         return ""
 
-# file-SiDYl9qVtFklcmHLf9CEJjxa
+    # file-SiDYl9qVtFklcmHLf9CEJjxa
     def __str__(self):
         if self.get_type() == "text":
             return self.thread_message.content[0].text.value
@@ -68,7 +70,7 @@ class OpenAIAssistant:
         self.assistant = None
         self.thread = None
         self.run = None
-        self.files : List[AssistantFile] = []
+        self.files: List[AssistantFile] = []
 
     def delete_file(self, file_id: str):
         print(f"Deleting file {file_id}")
@@ -107,7 +109,7 @@ class OpenAIAssistant:
         ))
         return file.id
 
-    def get_assistant_files(self, refresh_from_openai:bool=False) -> List[AssistantFile]:
+    def get_assistant_files(self, refresh_from_openai: bool = False) -> List[AssistantFile]:
         """
         :param refresh_from_openai: A boolean value indicating whether to retrieve all files from OpenAI or only the locally stored ones. Default is False.
         :return: A list of AssistantFile objects.
@@ -128,11 +130,10 @@ class OpenAIAssistant:
         else:
             return self.files
 
-
     def create_assistant(self, name: str, instructions: str,
                          tools: List[Literal["retrieval", "code_interpreter", "function"]] = ["retrieval"],
                          model: Literal["gpt-3.5-turbo-1106", "gpt-4.0-turbo"] = "gpt-3.5-turbo-1106",
-                         include_files:bool = False):
+                         include_files: bool = False):
         tool_list = []
         for tool in tools:
             tool_list.append({
@@ -159,7 +160,7 @@ class OpenAIAssistant:
         if self.thread is None:
             self.thread = self.openai_client.beta.threads.create()
 
-    def _add_user_prompt(self, user_prompt: str, include_files:bool = False) -> ThreadMessage:
+    def _add_user_prompt(self, user_prompt: str, include_files: bool = False) -> ThreadMessage:
         self._create_conversation()
         file_ids = []
         if include_files:
@@ -174,7 +175,7 @@ class OpenAIAssistant:
         )
         return message
 
-    def submit_user_prompt(self, user_prompt: str, instructions: str = "", include_files:bool = False) -> Run:
+    def submit_user_prompt(self, user_prompt: str, instructions: str = "", include_files: bool = False) -> Run:
         self._add_user_prompt(user_prompt, include_files)
 
         if include_files:
@@ -204,7 +205,6 @@ class OpenAIAssistant:
 
         return thread_messages
 
-
     def poll_for_assistant_conversation(self) -> List[AssistantThreadMessage]:
         response = self.get_run_status()
         while response != "completed":
@@ -218,4 +218,3 @@ class OpenAIAssistant:
         for message in conversation:
             messages.append(message)
         return messages
-
