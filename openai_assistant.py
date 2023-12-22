@@ -41,6 +41,11 @@ class AssistantThreadMessage:
         elif self.get_type() == "image_file":
             return [self.thread_message.content[0].image_file.file_id, self.thread_message.content[1].text.value]
 
+    def get_message_annotations(self) -> str | List[str]:
+        if self.get_type() == "text":
+            return self.thread_message.content[0].text.annotations
+        return ""
+
 # file-SiDYl9qVtFklcmHLf9CEJjxa
     def __str__(self):
         if self.get_type() == "text":
@@ -206,6 +211,7 @@ class OpenAIAssistant:
             print(response)
             time.sleep(1)
             response = self.get_run_status()
+        print(response)
 
         conversation = self.get_assistant_conversation()
         messages = []
