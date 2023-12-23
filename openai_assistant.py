@@ -1,6 +1,6 @@
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, List
 
 from openai import OpenAI
@@ -13,8 +13,8 @@ from openai.types.file_object import FileObject
 @dataclass
 class AssistantFile:
     file_id: str
-    file_path: str | None = None
-    file_object: FileObject | None = None
+    file_path: str = field(default=None)
+    file_object: FileObject = field(default=None)
 
 
 class AssistantThreadMessage:
@@ -37,16 +37,16 @@ class AssistantThreadMessage:
     def get_type(self) -> str:
         return self.thread_message.content[0].type
 
-    def get_message(self) -> str | List[str]:
+    def get_message(self) -> List[str]:
         if self.get_type() == "text":
-            return self.thread_message.content[0].text.value
+            return [self.thread_message.content[0].text.value]
         elif self.get_type() == "image_file":
             return [self.thread_message.content[0].image_file.file_id, self.thread_message.content[1].text.value]
 
-    def get_message_annotations(self) -> str | List[str]:
+    def get_message_annotations(self) -> List[str]:
         if self.get_type() == "text":
-            return self.thread_message.content[0].text.annotations
-        return ""
+            return [self.thread_message.content[0].text.annotations]
+        return []
 
     # file-SiDYl9qVtFklcmHLf9CEJjxa
     def __str__(self):
@@ -73,7 +73,6 @@ class OpenAIAssistant:
         self.files: List[AssistantFile] = []
 
     def delete_file(self, file_id: str):
-        print(f"Deleting file {file_id}")
         self.openai_client.files.delete(file_id=file_id)
 
     def delete_files(self):
@@ -207,14 +206,22 @@ class OpenAIAssistant:
 
     def poll_for_assistant_conversation(self) -> List[AssistantThreadMessage]:
         response = self.get_run_status()
+        max_timeout = 60
+
         while response != "completed":
             print(response)
             time.sleep(1)
             response = self.get_run_status()
+            max_timeout -= 1
+            if max_timeout == 0:
+                break
         print(response)
 
-        conversation = self.get_assistant_conversation()
-        messages = []
-        for message in conversation:
-            messages.append(message)
-        return messages
+        if max_timeout == 0:
+            return ["Timeout occurred. Please try again"]
+        else:
+            conversation = self.get_assistant_conversation()
+            messages = []
+            for message in conversation:
+                messages.append(message)
+            return messages
