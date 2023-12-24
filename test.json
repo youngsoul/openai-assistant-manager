@@ -1,0 +1,35 @@
+{
+  "type": "function",
+  "function": {
+    "name": "president_home_state",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "president": {
+          "type": "string",
+          "description": "The name of the US President as a string"
+        },
+        "state_options": {
+          "type": "array",
+          "description": "A list of potential states that the President was born in, with one of them being the correct birthplace state",
+          "items": {
+            "type": "string"
+          }
+        },
+        "temperature_format": {
+          "type": "string",
+          "description": "the temperature format to use for the temperature value.",
+          "enum": [
+            "celsius",
+            "fahrenheit"
+          ]
+        }
+      },
+      "required": [
+        "president",
+        "state_options",
+        "temperature_format"
+      ]
+    }
+  }
+}

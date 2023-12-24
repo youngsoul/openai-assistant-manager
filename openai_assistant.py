@@ -1,4 +1,6 @@
 import os
+import threading
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Literal, List
@@ -8,6 +10,23 @@ from openai.types.beta import AssistantDeleted
 from openai.types.beta.threads.run import Run
 from openai.types.beta.threads.thread_message import ThreadMessage
 from openai.types.file_object import FileObject
+
+
+@dataclass
+class FunctionParameter:
+    name: str
+    type: str
+    description: str
+    required: bool
+    enum_values: List[str] = field(default_factory=list)
+    # array_items_types is only needed if the type is 'array'
+    array_items_type: str = field(default=None)
+
+@dataclass
+class FunctionDefinition:
+    name: str
+    description: str
+    parameters: List[FunctionParameter] = field(default_factory=list)
 
 
 @dataclass
@@ -48,16 +67,17 @@ class AssistantThreadMessage:
             return [self.thread_message.content[0].text.annotations]
         return []
 
-    # file-SiDYl9qVtFklcmHLf9CEJjxa
+
     def __str__(self):
         if self.get_type() == "text":
             return self.thread_message.content[0].text.value
         elif self.get_type() == "image_file":
             return f"FileID: {self.thread_message.content[0].image_file.file_id}\n{self.thread_message.content[1].text.value}"
-
+        else:
+            return f"Unknown type: {self.get_type()}, MessageID: {self.thread_message.content[0]}"
 
 class OpenAIAssistant:
-    def __init__(self, api_key=None):
+    def __init__(self, api_key: str=None):
         if api_key is None:
             api_key = os.getenv("OPENAI_API_KEY")
 
@@ -71,6 +91,46 @@ class OpenAIAssistant:
         self.thread = None
         self.run = None
         self.files: List[AssistantFile] = []
+        self.functions: List[FunctionDefinition] = []
+
+    def create_function_definition_json(self) -> List[dict]:
+        result = []
+        for function_definition in self.functions:
+            function_template = {
+                "type": "function",
+                "function": {
+                    "name": function_definition.name,
+                    "description": function_definition.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }
+
+            for parameter in function_definition.parameters:
+                function_template["function"]["parameters"]["properties"][parameter.name] = {
+                    "type": parameter.type,
+                    "description": parameter.description
+                }
+                if parameter.enum_values:
+                    function_template["function"]["parameters"]["properties"][parameter.name][
+                        'enum'] = parameter.enum_values
+
+                if parameter.type == 'array':
+                    function_template["function"]["parameters"]["properties"][parameter.name]['items'] = {
+                        'type': parameter.array_items_type}
+                if parameter.required:
+                    function_template["function"]["parameters"]["required"].append(parameter.name)
+
+            # result.append(json.dumps(function_template))
+            result.append(function_template)
+
+        return result
+
+    def add_function(self, function: FunctionDefinition):
+        self.functions.append(function)
 
     def delete_file(self, file_id: str):
         self.openai_client.files.delete(file_id=file_id)
@@ -131,13 +191,18 @@ class OpenAIAssistant:
 
     def create_assistant(self, name: str, instructions: str,
                          tools: List[Literal["retrieval", "code_interpreter", "function"]] = ["retrieval"],
-                         model: Literal["gpt-3.5-turbo-1106", "gpt-4.0-turbo"] = "gpt-3.5-turbo-1106",
+                         model: Literal["gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4.0-turbo"] = "gpt-3.5-turbo-1106",
                          include_files: bool = False):
         tool_list = []
         for tool in tools:
-            tool_list.append({
-                "type": tool
-            })
+            if tool == "function":
+                function_json_obj_list = self.create_function_definition_json()
+                for function in function_json_obj_list:
+                    tool_list.append(function)
+            else:
+                tool_list.append({
+                    "type": tool
+                })
         file_ids = []
         if include_files:
             for file in self.files:
@@ -187,12 +252,13 @@ class OpenAIAssistant:
         )
         return self.run
 
-    def get_run_status(self) -> str:
-        response = self.openai_client.beta.threads.runs.retrieve(
+    def get_run(self) -> Run:
+        the_run = self.openai_client.beta.threads.runs.retrieve(
             thread_id=self.thread.id,
             run_id=self.run.id
         )
-        return response.status
+        return the_run
+
 
     def get_assistant_conversation(self) -> List[AssistantThreadMessage]:
         messages = self.openai_client.beta.threads.messages.list(
@@ -204,14 +270,31 @@ class OpenAIAssistant:
 
         return thread_messages
 
-    def poll_for_assistant_conversation(self) -> List[AssistantThreadMessage]:
-        response = self.get_run_status()
-        max_timeout = 60
+    def poll_for_assistant_conversation(self, max_wait_time: int = 60) -> List[AssistantThreadMessage]:
+        the_run = self.get_run()
+        response = the_run.status
+        max_timeout = max_wait_time
 
-        while response != "completed":
+        # we cannot just look for != 'complete' because it might be 'requires_action'
+        # when we need to call a function
+        while response == "queued" or response == "in_progress" or response == "requires_action":
+            the_run = self.get_run()
+            response = the_run.status
             print(response)
+            if response == "requires_action":
+                tool_outputs = []
+                tool_calls = the_run.required_action.submit_tool_outputs.tool_calls
+                for tool_call in tool_calls:
+                    tool_output = self.handle_requires_action(tool_call)
+                    tool_outputs.append(tool_output)
+                self.openai_client.beta.threads.runs.submit_tool_outputs(thread_id=self.thread.id,
+                                                                         run_id=the_run.id, tool_outputs=tool_outputs)
+                time.sleep(1)
+                the_run = self.get_run()
+                response = the_run.status
+                continue
+
             time.sleep(1)
-            response = self.get_run_status()
             max_timeout -= 1
             if max_timeout == 0:
                 break
@@ -225,3 +308,6 @@ class OpenAIAssistant:
             for message in conversation:
                 messages.append(message)
             return messages
+
+    def handle_requires_action(self, tool_call) -> dict:
+        raise NotImplementedError("handle_requires_action is not implemented.  Expected to be implemented in base classes")
