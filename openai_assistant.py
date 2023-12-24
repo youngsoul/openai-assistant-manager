@@ -191,7 +191,7 @@ class OpenAIAssistant:
 
     def create_assistant(self, name: str, instructions: str,
                          tools: List[Literal["retrieval", "code_interpreter", "function"]] = ["retrieval"],
-                         model: Literal["gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4.0-turbo"] = "gpt-3.5-turbo-1106",
+                         model: Literal["gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4-1106-preview"] = "gpt-3.5-turbo-1106",
                          include_files: bool = False):
         tool_list = []
         for tool in tools:
@@ -280,7 +280,9 @@ class OpenAIAssistant:
         while response == "queued" or response == "in_progress" or response == "requires_action":
             the_run = self.get_run()
             response = the_run.status
-            print(response)
+
+            self.run_response_callback(the_run=the_run)
+
             if response == "requires_action":
                 tool_outputs = []
                 tool_calls = the_run.required_action.submit_tool_outputs.tool_calls
@@ -311,3 +313,6 @@ class OpenAIAssistant:
 
     def handle_requires_action(self, tool_call) -> dict:
         raise NotImplementedError("handle_requires_action is not implemented.  Expected to be implemented in base classes")
+
+    def run_response_callback(self, the_run: Run):
+        print(f"The Run Status is: {the_run.status}")

@@ -79,13 +79,13 @@ if __name__ == '__main__':
 
         # create assistant
         print("create assistant")
-        assistant.create_assistant(name="US President Quiz Bot", model='gpt-3.5-turbo',
+        assistant.create_assistant(name="US President Quiz Bot", model='gpt-4-1106-preview',
                                     tools=['function'],
-                                   instructions="You help create a single question quiz where you give a random name for a US President and a list of birthplace states, where only one is the correct birthplace state of the president. Later you check if the answer returned is correct."
+                                   instructions="You help create a quiz where you give a US President and a list of birthplace states, where only one is the correct birthplace state of the president. Later you check if answers returned are correct."
                 )
 
         # create user prompt
-        user_prompt = "Create a new single quiz question with a random US President and a list of options for the home state of birth. Then I will reply with a single state name and let me know if I got it right."
+        user_prompt = "Create a new quiz question with a US President and a list of options for the home state of birth. Then I will reply with a single state and let me know if I got it right."
         assistant.submit_user_prompt(user_prompt=user_prompt, include_files=False)
 
         messages = assistant.poll_for_assistant_conversation()
