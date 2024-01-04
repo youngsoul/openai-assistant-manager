@@ -1,3 +1,8 @@
 openai
 python-dotenv
 pytest
+jupyter
+databot-py
+pandas
+requests
+bottle
