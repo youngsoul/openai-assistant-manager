@@ -27,30 +27,27 @@ class DatabotOpenAiAssistant(OpenAIAssistant):
     def __init__(self, api_key: str = None):
         super().__init__(api_key=api_key)
 
-    def handle_requires_action(self, tool_call) -> dict:
+    def handle_requires_action(self, tool_call, function_name: str, function_args:str) -> str:
+        output = None
         try:
             print(tool_call)
-            print(tool_call.function.name)
-            print(tool_call.function.arguments)
-            args = json.loads(tool_call.function.arguments)
+            print(function_name)
+            print(function_args)
+            args = json.loads(function_args)
 
-            output = get_databot_values(args['sensor_names'])
-            print(output)
+            sensor_value = get_databot_values(args['sensor_names'])
+            print(sensor_value)
+            output = f"{sensor_value}"
 
-            tool_output = {
-                "tool_call_id": tool_call.id,
-                "output": output
-            }
         except:
-            tool_output = {
-                "tool_call_id": tool_call.id,
-                "output": "unknown"
-            }
+            output = "unknown"
 
-        return tool_output
+        return output
 
 if __name__ == '__main__':
     load_dotenv()
+    fnames = get_databot_friendly_names()
+    print(fnames)
     assistant = DatabotOpenAiAssistant()
 
     try:
@@ -73,9 +70,9 @@ if __name__ == '__main__':
 
         assistant.add_function(function_definition)
 
-        # funcs_json = assistant.create_function_definition_json()
-        # for func_json in funcs_json:
-        #     print(json.dumps(func_json, indent=2))
+        funcs_json = assistant.create_function_definition_json()
+        for func_json in funcs_json:
+            print(json.dumps(func_json, indent=2))
 
         # create assistant
         print("create assistant")
@@ -95,3 +92,4 @@ if __name__ == '__main__':
         print("delete assistant")
         resp = assistant.delete_assistant()
         print(resp)
+

@@ -254,7 +254,7 @@ class OpenAIAssistant:
         # if no instructions are given, supply the default instruction
         if instructions is None:
             instructions = self.get_assistant_instructions()
-            if include_files:
+            if include_files and len(file_ids) > 0:
                 instructions = instructions + f"\n Use files with ids: {','.join(file_ids)} associated with this assistant when answering a question."
 
 
@@ -340,8 +340,18 @@ class OpenAIAssistant:
             if response == "requires_action":
                 tool_outputs = []
                 tool_calls = the_run.required_action.submit_tool_outputs.tool_calls
+
                 for tool_call in tool_calls:
-                    tool_output = self.handle_requires_action(tool_call)
+                    function_name = tool_call.function.name
+                    function_args = tool_call.function.arguments
+
+                    function_output = self.handle_requires_action(tool_call, function_name, function_args)
+
+                    tool_output = {
+                        "tool_call_id": tool_call.id,
+                        "output": function_output
+                    }
+
                     tool_outputs.append(tool_output)
                 self.openai_client.beta.threads.runs.submit_tool_outputs(thread_id=self.thread.id,
                                                                          run_id=the_run.id, tool_outputs=tool_outputs)
@@ -366,7 +376,7 @@ class OpenAIAssistant:
             self.message_history = messages
             return messages
 
-    def handle_requires_action(self, tool_call) -> dict:
+    def handle_requires_action(self, tool_call, function_name: str, function_args: str) -> str:
         raise NotImplementedError(
             "handle_requires_action is not implemented.  Expected to be implemented in base classes")
 

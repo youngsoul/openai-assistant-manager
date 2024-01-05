@@ -31,20 +31,16 @@ class QuizOpenAiAssistant(OpenAIAssistant):
     def __init__(self, api_key: str = None):
         super().__init__(api_key=api_key)
 
-    def handle_requires_action(self, tool_call) -> dict:
+    def handle_requires_action(self, tool_call, function_name, function_args) -> dict:
         print(tool_call)
-        print(tool_call.function.name)
-        print(tool_call.function.arguments)
-        args = json.loads(tool_call.function.arguments)
+        print(function_name)
+        print(function_args)
+        args = json.loads(function_args)
 
         result = president_home_state(args['president'], args['state_options'])
         print(result)
-        tool_output = {
-            "tool_call_id": tool_call.id,
-            "output": result
-        }
 
-        return tool_output
+        return result
 
 if __name__ == '__main__':
     load_dotenv()
