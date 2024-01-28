@@ -361,6 +361,8 @@ class OpenAIAssistant:
                 continue
 
             time.sleep(1)
+            the_run = self.get_run()
+            response = the_run.status
             max_timeout -= 1
             if max_timeout == 0:
                 break
